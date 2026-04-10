@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dra Laksen Grand Prix 🐟</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --primary: #0a3d2e;
+    --accent: #f0a500;
+    --danger: #c0392b;
+    --success: #27ae60;
+    --bg: #f5f0e8;
+    --surface: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b7280;
+    --border: #e2d9c9;
+    --radius: 12px;
+    --font-display: 'Bebas Neue', cursive;
+    --font-body: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ─── HEADER ─── */
+  .header {
+    background: var(--primary);
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  }
+  .header-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: var(--accent);
+  }
+  .header-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    margin-top: 2px;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .team-badge {
+    background: rgba(240,165,0,0.2);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .btn-logout {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.7);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-body);
+  }
+  .btn-logout:hover { background: rgba(255,255,255,0.1); color: white; }
+
+  /* ─── PAGES ─── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ─── LOGIN ─── */
+  .login-wrap {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--primary);
+    position: relative;
+    overflow: hidden;
+  }
+  .login-wrap::before {
+    content: '🐟';
+    position: absolute;
+    font-size: 300px;
+    opacity: 0.04;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .login-card {
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 400px;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .login-logo {
+    font-family: var(--font-display);
+    font-size: 42px;
+    color: var(--primary);
+    letter-spacing: 3px;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .login-emoji {
+    text-align: center;
+    font-size: 40px;
+    margin-bottom: 8px;
+  }
+  .login-tagline {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 32px;
+  }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .form-group input, .form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.2s;
+    outline: none;
+    appearance: none;
+  }
+  .form-group input:focus, .form-group select:focus {
+    border-color: var(--primary);
+  }
+  .btn-primary {
+    width: 100%;
+    padding: 14px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+  .btn-primary:hover { background: #0d5240; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .login-admin-link {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .login-admin-link a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .error-msg {
+    background: #fdf2f2;
+    border: 1px solid #f5c6cb;
+    color: var(--danger);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-top: 12px;
+    display: none;
+  }
+
+  /* ─── MAIN LAYOUT ─── */
+  .main-layout {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  /* ─── SCOREBOARD BANNER ─── */
+  .score-banner {
+    background: var(--primary);
+    color: white;
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .score-banner-label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .score-banner-value {
+    font-family: var(--font-display);
+    font-size: 52px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .score-banner-rank {
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+    margin-top: 4px;
+  }
+
+  /* ─── SECTION TITLE ─── */
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: var(--primary);
+    margin-bottom: 16px;
+  }
+
+  /* ─── TASK CARDS ─── */
+  .tasks-grid {
+    display: grid;
+    gap: 12px;
+  }
+  .task-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.2s;
+  }
+  .task-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .task-card.done { border-color: #a7f3d0; background: #f0fdf4; }
+  .task-card.pending { border-color: #fde68a; background: #fffbeb; }
+  .task-card.rejected { border-color: #fecaca; background: #fef2f2; }
+
+  .task-points {
+    background: var(--primary);
+    color: var(--accent);
+    font-family: var(--font-display);
+    font-size: 22px;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .task-card.done .task-points { background: var(--success); color: white; }
+  .task-card.pending .task-points { background: var(--accent); color: var(--primary); }
+  .task-card.rejected .task-points { background: var(--danger); color: white; }
+
+  .task-info { flex: 1; min-width: 0; }
+  .task-name {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .task-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .task-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .status-none { background: #f3f4f6; color: var(--muted); }
+  .status-pending { background: #fef3c7; color: #92400e; }
+  .status-approved { background: #d1fae5; color: #065f46; }
+  .status-rejected { background: #fee2e2; color: #991b1b; }
+
+  .btn-upload {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-upload:hover { background: #0d5240; }
+  .btn-upload:disabled { background: #9ca3af; cursor: not-allowed; }
+
+  /* ─── UPLOAD MODAL ─── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 28px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--primary);
+    margin-bottom: 4px;
+  }
+  .modal-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .upload-zone:hover { border-color: var(--primary); background: #f8fffe; }
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .upload-zone-icon { font-size: 36px; margin-bottom: 8px; }
+  .upload-zone-text { font-size: 14px; color: var(--muted); }
+  .upload-zone-hint { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+  .upload-preview {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: none;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .btn-secondary {
+    flex: 1;
+    padding: 12px;
+    background: transparent;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+  }
+  .btn-secondary:hover { background: var(--bg); }
+  .btn-submit {
+    flex: 2;
+    padding: 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-submit:hover { background: #0d5240; }
+  .btn-submit:disabled { background: #9ca3af; cursor: not-allowed; }
+
+  /* ─── ADMIN ─── */
+  .admin-layout {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+  .admin-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    background: var(--surface);
+    padding: 6px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    width: fit-content;
+  }
+  .admin-tab {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .admin-tab.active { background: var(--primary); color: white; }
+
+  .admin-section { display: none; }
+  .admin-section.active { display: block; }
+
+  /* Submissions */
+  .submission-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .submission-header {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .submission-meta { flex: 1; min-width: 0; }
+  .submission-team {
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .submission-task {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .submission-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .btn-approve {
+    background: var(--success);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-approve:hover { background: #219a52; }
+  .btn-reject {
+    background: var(--danger);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-reject:hover { background: #a93226; }
+  .submission-media {
+    padding: 0 18px 14px;
+  }
+  .submission-media img, .submission-media video {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+  }
+  .submission-points-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .submission-points-input input {
+    width: 80px;
+    padding: 6px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font-body);
+    outline: none;
+  }
+  .submission-points-input input:focus { border-color: var(--primary); }
+  .points-label { font-size: 13px; color: var(--muted); }
+
+  /* Scoreboard */
+  .score-table {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+  }
+  .score-row {
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    align-items: center;
+    padding: 14px 20px;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .score-row:last-child { border-bottom: none; }
+  .score-row:hover { background: var(--bg); }
+  .score-row.gold { background: #fffbeb; }
+  .score-rank {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .score-row.gold .score-rank { color: var(--accent); }
+  .score-name { font-weight: 500; font-size: 15px; }
+  .score-pts {
+    font-family: var(--font-display);
+    font-size: 24px;
+    color: var(--primary);
+  }
+
+  /* Admin manage */
+  .manage-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 640px) { .manage-grid { grid-template-columns: 1fr; } }
+  .manage-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    padding: 20px;
+  }
+  .manage-card-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--primary);
+    margin-bottom: 14px;
+  }
+  .manage-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+  .manage-item:last-of-type { border-bottom: none; }
+  .manage-item-name { font-size: 14px; font-weight: 500; }
+  .manage-item-sub { font-size: 12px; color: var(--muted); }
+  .btn-danger-sm {
+    background: transparent;
+    border: 1px solid #fecaca;
+    color: var(--danger);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-danger-sm:hover { background: #fee2e2; }
+
+  .add-form {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .add-form input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--font-body);
+    outline: none;
+    background: var(--bg);
+  }
+  .add-form input:focus { border-color: var(--primary); }
+  .btn-add {
+    padding: 10px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-add:hover { background: #0d5240; }
+
+  /* Loading */
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--primary);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 999;
+    transition: transform 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+  }
+  .empty-state-icon { font-size: 40px; margin-bottom: 8px; }
+  .empty-state-text { font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ══════════════════════════════
+     PAGE: TEAM LOGIN
+══════════════════════════════ -->
+<div class="page active" id="page-login">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-emoji">🐟</div>
+      <div class="login-logo">DRALAKSEN GP</div>
+      <div class="login-tagline">Velg laget ditt og logg inn</div>
+
+      <div class="form-group">
+        <label>Lag</label>
+        <select id="login-team">
+          <option value="">Velg lag...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Passord</label>
+        <input type="password" id="login-password" placeholder="Lagets passord" autocomplete="current-password">
+      </div>
+      <button class="btn-primary" onclick="teamLogin()">Logg inn 🎣</button>
+      <div class="error-msg" id="login-error">Feil passord. Prøv igjen.</div>
+
+      <div class="login-admin-link">
+        Arrangør? <a href="#" onclick="showAdminLogin()">Gå til adminpanel</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     PAGE: ADMIN LOGIN
+══════════════════════════════ -->
+<div class="page" id="page-admin-login">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-emoji">⚙️</div>
+      <div class="login-logo">ADMINPANEL</div>
+      <div class="login-tagline">Kun for arrangør</div>
+
+      <div class="form-group">
+        <label>Adminpassord</label>
+        <input type="password" id="admin-password" placeholder="Passord" autocomplete="current-password">
+      </div>
+      <button class="btn-primary" onclick="adminLogin()">Logg inn</button>
+      <div class="error-msg" id="admin-error">Feil passord.</div>
+
+      <div class="login-admin-link">
+        <a href="#" onclick="showTeamLogin()">← Tilbake til laginnlogging</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     PAGE: TEAM PORTAL
+══════════════════════════════ -->
+<div class="page" id="page-team">
+  <div class="header">
+    <div>
+      <div class="header-title">DRALAKSEN GP 🐟</div>
+      <div class="header-sub">Lagportal</div>
+    </div>
+    <div class="header-right">
+      <div class="team-badge" id="team-name-badge"></div>
+      <button class="btn-logout" onclick="logout()">Logg ut</button>
+    </div>
+  </div>
+
+  <div class="main-layout">
+    <div class="score-banner">
+      <div>
+        <div class="score-banner-label">Poengsum</div>
+        <div class="score-banner-value" id="team-score">0</div>
+        <div class="score-banner-rank" id="team-rank"></div>
+      </div>
+      <div style="font-size:60px;opacity:0.3;">🏆</div>
+    </div>
+
+    <div class="section-title">Oppgaver</div>
+    <div class="tasks-grid" id="tasks-list">
+      <div class="loading"><div class="spinner"></div>Laster oppgaver...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     PAGE: ADMIN PANEL
+══════════════════════════════ -->
+<div class="page" id="page-admin">
+  <div class="header">
+    <div>
+      <div class="header-title">DRALAKSEN GP ⚙️</div>
+      <div class="header-sub">Adminpanel</div>
+    </div>
+    <div class="header-right">
+      <button class="btn-logout" onclick="logout()">Logg ut</button>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchTab('submissions')">Innleveringer</button>
+      <button class="admin-tab" onclick="switchTab('scoreboard')">Poengoversikt</button>
+      <button class="admin-tab" onclick="switchTab('manage')">Administrer</button>
+    </div>
+
+    <!-- Submissions -->
+    <div class="admin-section active" id="tab-submissions">
+      <div id="submissions-list">
+        <div class="loading"><div class="spinner"></div>Laster innleveringer...</div>
+      </div>
+    </div>
+
+    <!-- Scoreboard -->
+    <div class="admin-section" id="tab-scoreboard">
+      <div class="score-table" id="scoreboard-list">
+        <div class="loading"><div class="spinner"></div>Laster poengoversikt...</div>
+      </div>
+    </div>
+
+    <!-- Manage -->
+    <div class="admin-section" id="tab-manage">
+      <div class="manage-grid">
+        <!-- Teams -->
+        <div class="manage-card">
+          <div class="manage-card-title">Lag</div>
+          <div id="manage-teams-list"></div>
+          <div class="add-form">
+            <input type="text" id="new-team-name" placeholder="Lagnavn">
+            <input type="password" id="new-team-password" placeholder="Passord">
+            <button class="btn-add" onclick="addTeam()">+ Legg til lag</button>
+          </div>
+        </div>
+
+        <!-- Tasks -->
+        <div class="manage-card">
+          <div class="manage-card-title">Oppgaver</div>
+          <div id="manage-tasks-list"></div>
+          <div class="add-form">
+            <input type="text" id="new-task-title" placeholder="Oppgavetittel">
+            <input type="text" id="new-task-desc" placeholder="Beskrivelse (valgfritt)">
+            <input type="number" id="new-task-points" placeholder="Poengverdi" min="1">
+            <button class="btn-add" onclick="addTask()">+ Legg til oppgave</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-task-name">Last opp bevis</div>
+    <div class="modal-sub" id="modal-task-pts"></div>
+    <img id="upload-preview-img" class="upload-preview" alt="Forhåndsvisning">
+    <video id="upload-preview-vid" class="upload-preview" controls></video>
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" accept="image/*,video/*" onchange="handleFileSelect(this)">
+      <div class="upload-zone-icon">📷</div>
+      <div class="upload-zone-text">Trykk for å velge bilde eller video</div>
+      <div class="upload-zone-hint">JPG, PNG, MP4, MOV – maks 50MB</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Avbryt</button>
+      <button class="btn-submit" id="submit-btn" onclick="submitProof()" disabled>Last opp bevis 🐟</button>
+    </div>
+    <div class="error-msg" id="upload-error"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pbwyicmejibrlpsvqglr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_0-ZGIl24aNt4Kt3x09Ql7w_b8eZQrye';
+const ADMIN_PASSWORD = 'arsenalerbest67';
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentTeam = null;
+let currentTaskId = null;
+let selectedFile = null;
+let isAdmin = false;
+
+// ─── UTILS ───
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+}
+
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ─── AUTH ───
+function showAdminLogin() { showPage('admin-login'); }
+function showTeamLogin() { showPage('login'); }
+
+async function teamLogin() {
+  const teamName = document.getElementById('login-team').value;
+  const password = document.getElementById('login-password').value;
+  const err = document.getElementById('login-error');
+  err.style.display = 'none';
+
+  if (!teamName) { err.textContent = 'Velg et lag.'; err.style.display = 'block'; return; }
+
+  const { data, error } = await db.from('teams').select('*').eq('name', teamName).eq('password_hash', password).single();
+  if (error || !data) { err.style.display = 'block'; return; }
+
+  currentTeam = data;
+  isAdmin = false;
+  document.getElementById('team-name-badge').textContent = data.name;
+  showPage('team');
+  loadTeamTasks();
+}
+
+function adminLogin() {
+  const pw = document.getElementById('admin-password').value;
+  const err = document.getElementById('admin-error');
+  if (pw !== ADMIN_PASSWORD) { err.style.display = 'block'; return; }
+  isAdmin = true;
+  currentTeam = null;
+  showPage('admin');
+  loadAdminSubmissions();
+  loadScoreboard();
+  loadManageData();
+}
+
+function logout() {
+  currentTeam = null;
+  isAdmin = false;
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-team').value = '';
+  showPage('login');
+}
+
+// ─── TEAM PORTAL ───
+async function loadTeamTasks() {
+  const list = document.getElementById('tasks-list');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div>Laster oppgaver...</div>';
+
+  const [{ data: tasks }, { data: subs }] = await Promise.all([
+    db.from('tasks').select('*').order('title'),
+    db.from('submissions').select('*').eq('team_id', currentTeam.id)
+  ]);
+
+  // Update score
+  const approvedPoints = (subs || []).filter(s => s.status === 'approved').reduce((a, s) => a + (s.points_awarded || 0), 0);
+  document.getElementById('team-score').textContent = approvedPoints;
+
+  // Rank
+  const { data: allTeams } = await db.from('teams').select('id, name, score').order('score', { ascending: false });
+  const rank = (allTeams || []).findIndex(t => t.id === currentTeam.id) + 1;
+  document.getElementById('team-rank').textContent = rank > 0 ? `#${rank} av ${allTeams.length} lag` : '';
+
+  const subMap = {};
+  (subs || []).forEach(s => { subMap[s.task_id] = s; });
+
+  if (!tasks || tasks.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">Ingen oppgaver lagt til ennå</div></div>';
+    return;
+  }
+
+  list.innerHTML = tasks.map(task => {
+    const sub = subMap[task.id];
+    const status = sub ? sub.status : 'none';
+    const statusLabels = { none: 'Ikke levert', pending: 'Venter på godkjenning', approved: '✓ Godkjent', rejected: '✗ Avvist' };
+    const statusClass = `status-${status}`;
+    const cardClass = status === 'approved' ? 'done' : status === 'pending' ? 'pending' : status === 'rejected' ? 'rejected' : '';
+    const canUpload = status === 'none' || status === 'rejected';
+
+    return `<div class="task-card ${cardClass}">
+      <div class="task-points">${task.points}</div>
+      <div class="task-info">
+        <div class="task-name">${task.title}</div>
+        ${task.description ? `<div class="task-desc">${task.description}</div>` : ''}
+        <span class="task-status ${statusClass}">${statusLabels[status]}</span>
+      </div>
+      ${canUpload ? `<button class="btn-upload" onclick="openUpload('${task.id}', '${task.title.replace(/'/g, "\\'")}', ${task.points})">Last opp bevis</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ─── UPLOAD MODAL ───
+function openUpload(taskId, taskName, taskPoints) {
+  currentTaskId = taskId;
+  selectedFile = null;
+  document.getElementById('modal-task-name').textContent = taskName;
+  document.getElementById('modal-task-pts').textContent = `${taskPoints} poeng`;
+  document.getElementById('file-input').value = '';
+  document.getElementById('upload-preview-img').style.display = 'none';
+  document.getElementById('upload-preview-vid').style.display = 'none';
+  document.getElementById('upload-zone').style.display = 'block';
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('upload-error').style.display = 'none';
+  document.getElementById('upload-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('upload-modal').classList.remove('open');
+}
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 50 * 1024 * 1024) {
+    document.getElementById('upload-error').textContent = 'Filen er for stor (maks 50MB).';
+    document.getElementById('upload-error').style.display = 'block';
+    return;
+  }
+  selectedFile = file;
+  const url = URL.createObjectURL(file);
+  const img = document.getElementById('upload-preview-img');
+  const vid = document.getElementById('upload-preview-vid');
+  document.getElementById('upload-zone').style.display = 'none';
+
+  if (file.type.startsWith('image/')) {
+    img.src = url; img.style.display = 'block'; vid.style.display = 'none';
+  } else {
+    vid.src = url; vid.style.display = 'block'; img.style.display = 'none';
+  }
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('upload-error').style.display = 'none';
+}
+
+async function submitProof() {
+  if (!selectedFile || !currentTaskId) return;
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Laster opp...';
+
+  const ext = selectedFile.name.split('.').pop();
+  const path = `${currentTeam.id}/${currentTaskId}_${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await db.storage.from('proofs').upload(path, selectedFile, { upsert: true });
+  if (uploadError) {
+    document.getElementById('upload-error').textContent = 'Feil ved opplasting. Prøv igjen.';
+    document.getElementById('upload-error').style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Last opp bevis 🐟';
+    return;
+  }
+
+  const { data: urlData } = db.storage.from('proofs').getPublicUrl(path);
+
+  // Upsert submission
+  await db.from('submissions').upsert({
+    team_id: currentTeam.id,
+    task_id: currentTaskId,
+    file_url: urlData.publicUrl,
+    status: 'pending',
+    points_awarded: 0,
+    submitted_at: new Date().toISOString()
+  }, { onConflict: 'team_id,task_id' });
+
+  closeModal();
+  showToast('Bevis lastet opp! Venter på godkjenning 🎣');
+  loadTeamTasks();
+}
+
+// ─── ADMIN ───
+function switchTab(tab) {
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  if (tab === 'submissions') loadAdminSubmissions();
+  if (tab === 'scoreboard') loadScoreboard();
+  if (tab === 'manage') loadManageData();
+}
+
+async function loadAdminSubmissions() {
+  const list = document.getElementById('submissions-list');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div>Laster...</div>';
+
+  const { data: subs } = await db.from('submissions')
+    .select('*, teams(name), tasks(title, points)')
+    .order('submitted_at', { ascending: false });
+
+  if (!subs || subs.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">Ingen innleveringer ennå</div></div>';
+    return;
+  }
+
+  const pending = subs.filter(s => s.status === 'pending');
+  const rest = subs.filter(s => s.status !== 'pending');
+
+  const renderSub = (s) => {
+    const isImg = s.file_url && (s.file_url.match(/\.(jpg|jpeg|png|gif|webp)/i));
+    const isVid = s.file_url && (s.file_url.match(/\.(mp4|mov|avi|webm)/i));
+    const statusColors = { pending: '#fef3c7', approved: '#d1fae5', rejected: '#fee2e2' };
+    const statusLabels = { pending: '⏳ Venter', approved: '✓ Godkjent', rejected: '✗ Avvist' };
+
+    return `<div class="submission-card" style="border-color: ${statusColors[s.status] || '#e2d9c9'}">
+      <div class="submission-header">
+        <div class="submission-meta">
+          <div class="submission-team">${s.teams?.name || 'Ukjent lag'}</div>
+          <div class="submission-task">${s.tasks?.title || 'Ukjent oppgave'} · ${s.tasks?.points || 0} poeng · ${statusLabels[s.status]}</div>
+        </div>
+        <div class="submission-actions">
+          <button class="btn-approve" onclick="approveSubmission('${s.id}', ${s.tasks?.points || 0})">✓ Godkjenn</button>
+          <button class="btn-reject" onclick="rejectSubmission('${s.id}')">✗ Avvis</button>
+        </div>
+      </div>
+      <div class="submission-media">
+        ${isImg ? `<img src="${s.file_url}" alt="Bevis" loading="lazy">` : ''}
+        ${isVid ? `<video src="${s.file_url}" controls></video>` : ''}
+        <div class="submission-points-input">
+          <span class="points-label">Tildel poeng:</span>
+          <input type="number" id="pts-${s.id}" value="${s.points_awarded || s.tasks?.points || 0}" min="0">
+        </div>
+      </div>
+    </div>`;
+  };
+
+  list.innerHTML =
+    (pending.length ? `<div class="section-title" style="margin-bottom:12px">⏳ Venter (${pending.length})</div>` + pending.map(renderSub).join('') : '') +
+    (rest.length ? `<div class="section-title" style="margin-top:24px;margin-bottom:12px">Behandlet</div>` + rest.map(renderSub).join('') : '');
+}
+
+async function approveSubmission(id, defaultPoints) {
+  const pts = parseInt(document.getElementById('pts-' + id)?.value) || defaultPoints;
+  const { data: sub } = await db.from('submissions').select('team_id').eq('id', id).single();
+
+  await db.from('submissions').update({ status: 'approved', points_awarded: pts }).eq('id', id);
+
+  // Recalculate team score
+  const { data: subs } = await db.from('submissions').select('points_awarded').eq('team_id', sub.team_id).eq('status', 'approved');
+  const total = (subs || []).reduce((a, s) => a + (s.points_awarded || 0), 0);
+  await db.from('teams').update({ score: total }).eq('id', sub.team_id);
+
+  showToast('✓ Godkjent og poeng tildelt!');
+  loadAdminSubmissions();
+}
+
+async function rejectSubmission(id) {
+  await db.from('submissions').update({ status: 'rejected', points_awarded: 0 }).eq('id', id);
+  showToast('Avvist.');
+  loadAdminSubmissions();
+}
+
+async function loadScoreboard() {
+  const list = document.getElementById('scoreboard-list');
+  const { data: teams } = await db.from('teams').select('name, score').order('score', { ascending: false });
+
+  if (!teams || teams.length === 0) {
+    list.innerHTML = '<div class="empty-state">Ingen lag</div>';
+    return;
+  }
+
+  const medals = ['🥇', '🥈', '🥉'];
+  list.innerHTML = teams.map((t, i) => `
+    <div class="score-row ${i === 0 ? 'gold' : ''}">
+      <div class="score-rank">${medals[i] || (i + 1)}</div>
+      <div class="score-name">${t.name}</div>
+      <div class="score-pts">${t.score || 0}</div>
+    </div>`).join('');
+}
+
+async function loadManageData() {
+  const [{ data: teams }, { data: tasks }] = await Promise.all([
+    db.from('teams').select('*').order('name'),
+    db.from('tasks').select('*').order('title')
+  ]);
+
+  const teamsList = document.getElementById('manage-teams-list');
+  teamsList.innerHTML = (teams || []).map(t => `
+    <div class="manage-item">
+      <div>
+        <div class="manage-item-name">${t.name}</div>
+        <div class="manage-item-sub">Passord: ${t.password_hash} · ${t.score || 0} poeng</div>
+      </div>
+      <button class="btn-danger-sm" onclick="deleteTeam('${t.id}')">Slett</button>
+    </div>`).join('');
+
+  const tasksList = document.getElementById('manage-tasks-list');
+  tasksList.innerHTML = (tasks || []).map(t => `
+    <div class="manage-item">
+      <div>
+        <div class="manage-item-name">${t.title}</div>
+        <div class="manage-item-sub">${t.points} poeng${t.description ? ' · ' + t.description : ''}</div>
+      </div>
+      <button class="btn-danger-sm" onclick="deleteTask('${t.id}')">Slett</button>
+    </div>`).join('');
+}
+
+async function addTeam() {
+  const name = document.getElementById('new-team-name').value.trim();
+  const pass = document.getElementById('new-team-password').value.trim();
+  if (!name || !pass) { showToast('Fyll inn navn og passord'); return; }
+
+  const { error } = await db.from('teams').insert({ name, password_hash: pass, score: 0 });
+  if (error) { showToast('Feil: ' + error.message); return; }
+
+  document.getElementById('new-team-name').value = '';
+  document.getElementById('new-team-password').value = '';
+  showToast('Lag lagt til!');
+  loadManageData();
+  loadTeamSelect();
+}
+
+async function addTask() {
+  const title = document.getElementById('new-task-title').value.trim();
+  const description = document.getElementById('new-task-desc').value.trim();
+  const points = parseInt(document.getElementById('new-task-points').value) || 10;
+  if (!title) { showToast('Fyll inn oppgavetittel'); return; }
+
+  const { error } = await db.from('tasks').insert({ title, description, points });
+  if (error) { showToast('Feil: ' + error.message); return; }
+
+  document.getElementById('new-task-title').value = '';
+  document.getElementById('new-task-desc').value = '';
+  document.getElementById('new-task-points').value = '';
+  showToast('Oppgave lagt til!');
+  loadManageData();
+}
+
+async function deleteTeam(id) {
+  if (!confirm('Er du sikker? Dette sletter laget og alle innleveringer.')) return;
+  await db.from('submissions').delete().eq('team_id', id);
+  await db.from('teams').delete().eq('id', id);
+  showToast('Lag slettet.');
+  loadManageData();
+}
+
+async function deleteTask(id) {
+  if (!confirm('Er du sikker? Dette sletter oppgaven og alle innleveringer.')) return;
+  await db.from('submissions').delete().eq('task_id', id);
+  await db.from('tasks').delete().eq('id', id);
+  showToast('Oppgave slettet.');
+  loadManageData();
+}
+
+// ─── INIT ───
+async function loadTeamSelect() {
+  const sel = document.getElementById('login-team');
+  const { data: teams } = await db.from('teams').select('name').order('name');
+  sel.innerHTML = '<option value="">Velg lag...</option>' +
+    (teams || []).map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+}
+
+async function seedData() {
+  // Check if teams already exist
+  const { data: existing } = await db.from('teams').select('id').limit(1);
+  if (existing && existing.length > 0) return;
+
+  const teams = [
+    { name: 'Nøkken', password_hash: 'qdxl4pow', score: 0 },
+    { name: 'Draugen', password_hash: 'twy9nzd2', score: 0 },
+    { name: 'Huldra', password_hash: 'kzll9qdy', score: 0 },
+    { name: 'Fossegrimmen', password_hash: '89mla59z', score: 0 },
+    { name: 'Tusseladden', password_hash: 'ivup2mzp', score: 0 },
+    { name: 'Kvitekransen', password_hash: 'j8vj4ea3', score: 0 },
+    { name: 'Havhesten', password_hash: 'xyhgxx9b', score: 0 },
+    { name: 'Lindormen', password_hash: 'efq6tqh1', score: 0 },
+    { name: 'Sjøormen', password_hash: '0trc1mrz', score: 0 },
+    { name: 'Stallo', password_hash: 'quz78oxa', score: 0 },
+    { name: 'Vettene', password_hash: 'ors19usp', score: 0 },
+    { name: 'Margkallen', password_hash: 'w2qbktav', score: 0 },
+    { name: 'Bøygen', password_hash: 'inu2zy6s', score: 0 },
+    { name: 'Gjengangeren', password_hash: 'pzhxkw3j', score: 0 },
+    { name: 'Skrømt', password_hash: 't9h872ob', score: 0 },
+  ];
+  const tasks = [
+    { title: 'Oppgave 1', description: '', points: 10 },
+    { title: 'Oppgave 2', description: '', points: 10 },
+    { title: 'Oppgave 3', description: '', points: 10 },
+    { title: 'Oppgave 4', description: '', points: 15 },
+    { title: 'Oppgave 5', description: '', points: 15 },
+    { title: 'Oppgave 6', description: '', points: 20 },
+  ];
+  await db.from('teams').insert(teams);
+  await db.from('tasks').insert(tasks);
+}
+
+async function init() {
+  await seedData();
+  await loadTeamSelect();
+}
+
+init();
+</script>
+</body>
+</html>
