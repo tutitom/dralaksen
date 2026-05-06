@@ -658,9 +658,12 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
     </div>
 
     <div class="admin-section active" id="tab-submissions">
-      <div class="filter-row">
+      <div class="filter-row" style="flex-wrap:wrap;gap:6px">
         <button class="filter-btn active" onclick="setFilter('pending', this)">⏳ Venter</button>
         <button class="filter-btn" onclick="setFilter('approved', this)">✓ Godkjent</button>
+        <select id="task-filter-select" onchange="setTaskFilter(this.value)" style="margin-left:auto;padding:6px 10px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:13px;background:#fff;cursor:pointer">
+          <option value="">Alle oppgaver</option>
+        </select>
       </div>
       <div id="submissions-list"><div class="loading"><div class="spinner"></div>Laster...</div></div>
     </div>
@@ -687,6 +690,11 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
             <input type="text" id="new-task-title" placeholder="Oppgavetittel">
             <input type="text" id="new-task-desc" placeholder="Beskrivelse (valgfritt)">
             <input type="number" id="new-task-points" placeholder="Poengverdi" min="1">
+            <select id="new-task-type" style="padding:8px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;background:#fff">
+              <option value="normal">Normal oppgave</option>
+              <option value="timed">Tidsoppgave ⏱️</option>
+              <option value="multiple">Flervideooppgave 📹</option>
+            </select>
             <button class="btn-add" onclick="addTask()">+ Legg til oppgave</button>
           </div>
         </div>
@@ -701,12 +709,11 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
     <div class="modal-handle"></div>
     <div class="modal-title" id="modal-task-name">Last opp bevis</div>
     <div class="modal-sub" id="modal-task-pts"></div>
-    <img id="upload-preview-img" class="upload-preview" alt="Forhåndsvisning">
-    <video id="upload-preview-vid" class="upload-preview" controls></video>
+    <div id="upload-previews"></div>
     <div class="upload-zone" id="upload-zone">
       <input type="file" id="file-input" accept="image/*,video/*" onchange="handleFileSelect(this)">
       <div class="upload-zone-icon">📷</div>
-      <div class="upload-zone-text">Trykk for å velge bilde eller video</div>
+      <div class="upload-zone-text" id="upload-zone-text">Trykk for å velge bilde eller video</div>
       <div class="upload-zone-hint">JPG, PNG, MP4, MOV – maks 50MB</div>
     </div>
     <div class="modal-actions">
@@ -725,7 +732,14 @@ const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentTeam = null, currentTaskId = null, selectedFile = null, isAdmin = false;
-let currentFilter = 'pending';
+let currentFilter = 'pending', currentTaskFilter = null, currentSubMap = {}, selectedFiles = [], currentAllowMultiple = false;
+
+function formatTime2(seconds) {
+  if (seconds == null) return '';
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = (seconds % 60).toFixed(2).padStart(5, '0');
+  return `${m}:${s}`;
+}
 
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -762,6 +776,7 @@ function adminLogin() {
   isAdmin = true;
   showPage('admin');
   loadAdminSubmissions();
+  loadAdminTaskList();
 }
 
 function logout() {
@@ -783,38 +798,62 @@ async function loadTeamTasks() {
   const { data: allTeams } = await db.from('teams').select('id,score').order('score',{ascending:false});
   const rank = (allTeams||[]).findIndex(t=>t.id===currentTeam.id)+1;
   document.getElementById('team-rank').textContent = rank>0 ? `#${rank} av ${(allTeams||[]).length} lag` : '';
-  const subMap = {};
-  (subs||[]).forEach(s => { subMap[s.task_id] = s; });
+  currentSubMap = {};
+  (subs||[]).forEach(s => { currentSubMap[s.task_id] = s; });
   if (!tasks||tasks.length===0) {
     list.innerHTML='<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">Ingen oppgaver ennå</div></div>';
     return;
   }
   const statusLabels = { none:'Ikke levert', pending:'Venter på godkjenning', approved:'✓ Godkjent', rejected:'✗ Avvist – last opp på nytt' };
   list.innerHTML = tasks.map(task => {
-    const sub = subMap[task.id];
+    const sub = currentSubMap[task.id];
     const status = sub ? sub.status : 'none';
     const cardClass = status==='approved'?'done':status==='pending'?'pending':status==='rejected'?'rejected':'';
     const canUpload = status==='none'||status==='rejected';
+    const safeTitle = task.title.replace(/'/g,"\\'");
+    const safeDesc = (task.description||'').replace(/'/g,"\\'");
+    const taskType = task.task_type||'normal';
+    const typeIcon = taskType==='timed'?' ⏱️':taskType==='multiple'?' 📹':'';
+    const timeInfo = status==='approved'&&taskType==='timed'&&sub?.time_result!=null?' · '+formatTime2(sub.time_result):'';
     return `<div class="task-card ${cardClass}">
       <div class="task-points">${task.points}</div>
       <div class="task-info">
-        <div class="task-name">${task.title}</div>
+        <div class="task-name">${task.title}${typeIcon}</div>
         ${task.description?`<div class="task-desc">${task.description}</div>`:''}
-        <span class="task-status status-${status}">${statusLabels[status]}</span>
+        <span class="task-status status-${status}">${statusLabels[status]}${timeInfo}</span>
       </div>
-      ${canUpload?`<button class="btn-upload" onclick="openUpload('${task.id}','${task.title.replace(/'/g,"\\'")}',${task.points},'${(task.description||'').replace(/'/g,"\\'")}')">Last opp</button>`:''}
+      <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
+        ${canUpload?`<button class="btn-upload" onclick="openUpload('${task.id}','${safeTitle}',${task.points},'${safeDesc}','${taskType}')">Last opp</button>`:''}
+        ${status==='approved'?`<button class="btn-upload" style="background:#f59e0b;font-size:12px;padding:5px 10px" onclick="openUpload('${task.id}','${safeTitle}',${task.points},'${safeDesc}','${taskType}')">Endre</button><button class="btn-upload" style="background:#ef4444;font-size:12px;padding:5px 10px" onclick="deleteTeamSubmission('${task.id}')">Slett</button>`:''}
+      </div>
     </div>`;
   }).join('');
 }
 
-function openUpload(taskId, taskName, taskPoints, taskDesc) {
-  currentTaskId = taskId; selectedFile = null;
+async function deleteTeamSubmission(taskId) {
+  if (!confirm('Slett innlevering? Poengene dine fjernes.')) return;
+  const sub = currentSubMap[taskId];
+  if (!sub) return;
+  await db.from('submissions').delete().eq('id', sub.id);
+  const {data: remaining} = await db.from('submissions').select('points_awarded').eq('team_id', currentTeam.id).eq('status','approved');
+  const total = (remaining||[]).reduce((a,s)=>a+(s.points_awarded||0),0);
+  await db.from('teams').update({score:total}).eq('id',currentTeam.id);
+  showToast('Innlevering slettet.');
+  loadTeamTasks();
+}
+
+function openUpload(taskId, taskName, taskPoints, taskDesc, taskType) {
+  currentTaskId = taskId; selectedFile = null; selectedFiles = [];
+  currentAllowMultiple = (taskType||'normal') === 'multiple';
   document.getElementById('modal-task-name').textContent = taskName;
   document.getElementById('modal-task-pts').textContent = (taskDesc||'') + (taskDesc?' · ':'') + taskPoints + ' poeng';
-  document.getElementById('file-input').value = '';
-  document.getElementById('upload-preview-img').style.display = 'none';
-  document.getElementById('upload-preview-vid').style.display = 'none';
+  const fi = document.getElementById('file-input');
+  fi.value = '';
+  fi.multiple = currentAllowMultiple;
+  document.getElementById('upload-previews').innerHTML = '';
   document.getElementById('upload-zone').style.display = 'block';
+  document.getElementById('upload-zone-text').textContent = currentAllowMultiple
+    ? 'Trykk for å velge én eller flere videoer' : 'Trykk for å velge bilde eller video';
   document.getElementById('submit-btn').disabled = true;
   document.getElementById('upload-error').style.display = 'none';
   document.getElementById('upload-modal').classList.add('open');
@@ -822,39 +861,47 @@ function openUpload(taskId, taskName, taskPoints, taskDesc) {
 function closeModal() { document.getElementById('upload-modal').classList.remove('open'); }
 
 function handleFileSelect(input) {
-  const file = input.files[0];
-  if (!file) return;
-  if (file.size > 50*1024*1024) {
-    document.getElementById('upload-error').textContent='Filen er for stor (maks 50MB).';
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  const tooBig = files.find(f => f.size > 50*1024*1024);
+  if (tooBig) {
+    document.getElementById('upload-error').textContent=`${tooBig.name} er for stor (maks 50MB).`;
     document.getElementById('upload-error').style.display='block'; return;
   }
-  selectedFile = file;
-  const url = URL.createObjectURL(file);
-  const img = document.getElementById('upload-preview-img');
-  const vid = document.getElementById('upload-preview-vid');
-  document.getElementById('upload-zone').style.display='none';
-  if (file.type.startsWith('image/')) { img.src=url; img.style.display='block'; vid.style.display='none'; }
-  else { vid.src=url; vid.style.display='block'; img.style.display='none'; }
-  document.getElementById('submit-btn').disabled=false;
-  document.getElementById('upload-error').style.display='none';
+  selectedFiles = files;
+  selectedFile = files[0];
+  const previews = document.getElementById('upload-previews');
+  previews.innerHTML = files.map(f => {
+    const url = URL.createObjectURL(f);
+    if (f.type.startsWith('image/')) return `<img src="${url}" class="upload-preview" style="display:block;width:100%;border-radius:10px;margin-bottom:6px">`;
+    return `<video src="${url}" class="upload-preview" controls style="display:block;width:100%;border-radius:10px;margin-bottom:6px"></video>`;
+  }).join('');
+  document.getElementById('upload-zone').style.display = currentAllowMultiple ? 'block' : 'none';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('upload-error').style.display = 'none';
 }
 
 async function submitProof() {
-  if (!selectedFile||!currentTaskId) return;
+  if (!selectedFiles.length||!currentTaskId) return;
   const btn = document.getElementById('submit-btn');
   btn.disabled=true; btn.textContent='Laster opp...';
-  const ext = selectedFile.name.split('.').pop();
-  const path = `${currentTeam.id}/${currentTaskId}_${Date.now()}.${ext}`;
-  const { error: uploadError } = await db.storage.from('proofs').upload(path, selectedFile, {upsert:true});
-  if (uploadError) {
-    document.getElementById('upload-error').textContent='Feil ved opplasting. Prøv igjen.';
-    document.getElementById('upload-error').style.display='block';
-    btn.disabled=false; btn.textContent='Last opp 🐟'; return;
+  const urls = [];
+  for (const file of selectedFiles) {
+    const ext = file.name.split('.').pop();
+    const path = `${currentTeam.id}/${currentTaskId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: uploadError } = await db.storage.from('proofs').upload(path, file, {upsert:true});
+    if (uploadError) {
+      document.getElementById('upload-error').textContent='Feil ved opplasting. Prøv igjen.';
+      document.getElementById('upload-error').style.display='block';
+      btn.disabled=false; btn.textContent='Last opp 🐟'; return;
+    }
+    const { data: urlData } = db.storage.from('proofs').getPublicUrl(path);
+    urls.push(urlData.publicUrl);
   }
-  const { data: urlData } = db.storage.from('proofs').getPublicUrl(path);
+  const fileUrl = urls.length === 1 ? urls[0] : JSON.stringify(urls);
   await db.from('submissions').upsert({
     team_id: currentTeam.id, task_id: currentTaskId,
-    file_url: urlData.publicUrl, status:'pending', points_awarded:0,
+    file_url: fileUrl, status:'pending', points_awarded:0,
     submitted_at: new Date().toISOString()
   }, {onConflict:'team_id,task_id'});
   closeModal();
@@ -868,45 +915,100 @@ function switchTab(tab, btn) {
   document.querySelectorAll('.admin-section').forEach(s=>s.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('tab-'+tab).classList.add('active');
-  if (tab==='submissions') loadAdminSubmissions();
+  if (tab==='submissions') { loadAdminSubmissions(); loadAdminTaskList(); }
   if (tab==='scoreboard') loadScoreboard();
   if (tab==='manage') loadManageData();
 }
 
 function setFilter(filter, btn) {
   currentFilter = filter;
+  currentTaskFilter = null;
+  document.getElementById('task-filter-select').value = '';
   document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   loadAdminSubmissions();
 }
 
+function setTaskFilter(taskId) {
+  currentTaskFilter = taskId || null;
+  loadAdminSubmissions();
+}
+
+async function loadAdminTaskList() {
+  const sel = document.getElementById('task-filter-select');
+  if (!sel) return;
+  const {data:tasks} = await db.from('tasks').select('id,title').order('created_at');
+  sel.innerHTML = '<option value="">Alle oppgaver</option>' +
+    (tasks||[]).map((t,i) => `<option value="${t.id}">Oppgave ${i+1}: ${t.title}</option>`).join('');
+}
+
 async function loadAdminSubmissions() {
   const list = document.getElementById('submissions-list');
   list.innerHTML='<div class="loading"><div class="spinner"></div>Laster...</div>';
-  const { data: subs } = await db.from('submissions')
-    .select('*, teams(name), tasks(title,description,points)')
-    .eq('status', currentFilter)
+
+  let query = db.from('submissions')
+    .select('*, teams(name), tasks(title,description,points,task_type)')
     .order('submitted_at', {ascending:false});
 
+  if (currentTaskFilter) {
+    query = query.eq('task_id', currentTaskFilter);
+  } else {
+    query = query.eq('status', currentFilter);
+  }
+
+  const { data: subs } = await query;
+
   if (!subs||subs.length===0) {
-    list.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${currentFilter==='pending'?'📭':'✅'}</div><div class="empty-state-text">${currentFilter==='pending'?'Ingen ventende innleveringer':'Ingen godkjente innleveringer'}</div></div>`;
+    list.innerHTML=`<div class="empty-state"><div class="empty-state-icon">${currentTaskFilter?'📋':currentFilter==='pending'?'📭':'✅'}</div><div class="empty-state-text">Ingen innleveringer</div></div>`;
     return;
   }
 
   const isImg = url => url&&url.match(/\.(jpg|jpeg|png|gif|webp)/i);
   const isVid = url => url&&url.match(/\.(mp4|mov|avi|webm)/i);
-
-  const formatTime = ts => {
-    const d = new Date(ts);
-    return d.toLocaleString('no-NO', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const renderMedia = fileUrl => {
+    let urls; try { urls = JSON.parse(fileUrl); if (!Array.isArray(urls)) urls = [fileUrl]; } catch { urls = [fileUrl]; }
+    return urls.map(url => isImg(url)?`<img src="${url}" alt="Bevis" loading="lazy">`:(isVid(url)?`<video src="${url}" controls></video>`:'')).join('');
   };
+  const fmtTs = ts => new Date(ts).toLocaleString('no-NO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 
-  list.innerHTML = subs.map(s => `
-    <div class="submission-card" id="sub-${s.id}">
+  list.innerHTML = subs.map(s => {
+    const isTimedTask = s.tasks?.task_type === 'timed';
+    const isPending = s.status === 'pending';
+    const isApproved = s.status === 'approved';
+    const safeTeam = (s.teams?.name||'').replace(/'/g,"\\'");
+
+    let actionsHtml = '';
+    if (isTimedTask && isPending) {
+      actionsHtml = `<div class="submission-actions-row">
+        <div class="points-field"><label>Tid (sek):</label>
+          <input type="number" id="time-${s.id}" value="${s.time_result!=null?s.time_result:''}" min="0" step="0.01" placeholder="sekunder" style="width:100px">
+        </div>
+        <button class="btn-approve" onclick="setTimedResult('${s.id}','${s.task_id}','${safeTeam}')">⏱️ Lagre tid</button>
+        <button class="btn-reject" onclick="rejectSubmission('${s.id}')">✗ Avvis</button>
+      </div>`;
+    } else if (isPending) {
+      actionsHtml = `<div class="submission-actions-row">
+        <div class="points-field"><label>Poeng:</label>
+          <input type="number" id="pts-${s.id}" value="${s.tasks?.points||10}" min="0">
+        </div>
+        <button class="btn-approve" onclick="approveSubmission('${s.id}','${safeTeam}')">✓ Godkjenn</button>
+        <button class="btn-reject" onclick="rejectSubmission('${s.id}')">✗ Avvis</button>
+      </div>`;
+    } else if (isApproved) {
+      const timeStr = isTimedTask && s.time_result!=null ? ` · ⏱️ ${formatTime2(s.time_result)}` : '';
+      actionsHtml = `<div style="font-size:13px;color:var(--success);font-weight:500;display:flex;align-items:center;gap:10px">
+        <span>✓ Godkjent · ${s.points_awarded||0} poeng${timeStr}</span>
+        <button class="btn-reject" onclick="adminDeleteSubmission('${s.id}')" style="padding:4px 10px;font-size:12px">Slett</button>
+      </div>`;
+    } else {
+      actionsHtml = `<div style="font-size:13px;color:#ef4444;font-weight:500">✗ Avvist</div>`;
+    }
+
+    return `<div class="submission-card" id="sub-${s.id}">
       <div class="submission-task-header">
-        <div class="submission-task-icon">🎯</div>
+        <div class="submission-task-icon">${isTimedTask?'⏱️':'🎯'}</div>
         <div>
-          <div class="submission-task-title">${s.tasks?.title||'Ukjent oppgave'}</div>
+          <div class="submission-task-title">${s.tasks?.title||'Ukjent oppgave'}${isTimedTask?' ⏱️':''}</div>
           ${s.tasks?.description?`<div class="submission-task-desc">${s.tasks.description}</div>`:''}
         </div>
         <div class="submission-task-pts">${s.tasks?.points||0} poeng</div>
@@ -914,23 +1016,13 @@ async function loadAdminSubmissions() {
       <div class="submission-body">
         <div class="submission-team-row">
           <div class="submission-team-name">🐟 ${s.teams?.name||'Ukjent lag'}</div>
-          <div class="submission-time">${formatTime(s.submitted_at)}</div>
+          <div class="submission-time">${fmtTs(s.submitted_at)}</div>
         </div>
-        <div class="submission-media">
-          ${isImg(s.file_url)?`<img src="${s.file_url}" alt="Bevis" loading="lazy">`:''}
-          ${isVid(s.file_url)?`<video src="${s.file_url}" controls></video>`:''}
-        </div>
-        ${currentFilter==='pending'?`
-        <div class="submission-actions-row">
-          <div class="points-field">
-            <label>Poeng:</label>
-            <input type="number" id="pts-${s.id}" value="${s.tasks?.points||10}" min="0">
-          </div>
-          <button class="btn-approve" onclick="approveSubmission('${s.id}','${s.teams?.name}')">✓ Godkjenn</button>
-          <button class="btn-reject" onclick="rejectSubmission('${s.id}')">✗ Avvis</button>
-        </div>`:'<div style="font-size:13px;color:var(--success);font-weight:500">✓ Godkjent · ' + (s.points_awarded||0) + ' poeng tildelt</div>'}
+        <div class="submission-media">${renderMedia(s.file_url)}</div>
+        ${actionsHtml}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function approveSubmission(id, teamName) {
@@ -947,9 +1039,48 @@ async function approveSubmission(id, teamName) {
 
 async function rejectSubmission(id) {
   await db.from('submissions').update({status:'rejected',points_awarded:0}).eq('id',id);
-  // Remove card from DOM immediately
   document.getElementById('sub-'+id)?.remove();
   showToast('Innlevering avvist.');
+}
+
+async function setTimedResult(subId, taskId, teamName) {
+  const timeVal = parseFloat(document.getElementById('time-'+subId)?.value);
+  if (isNaN(timeVal) || timeVal <= 0) { showToast('Legg inn gyldig tid i sekunder (f.eks. 75.43)'); return; }
+
+  const {data: sub} = await db.from('submissions').select('team_id').eq('id',subId).single();
+  await db.from('submissions').update({status:'approved', time_result:timeVal, points_awarded:0}).eq('id',subId);
+
+  const {data: taskSubs} = await db.from('submissions')
+    .select('id,team_id,time_result')
+    .eq('task_id',taskId).eq('status','approved');
+
+  const {data: taskInfo} = await db.from('tasks').select('points').eq('id',taskId).single();
+  const taskPoints = taskInfo?.points || 0;
+
+  const sorted = (taskSubs||[]).filter(s=>s.time_result!=null).sort((a,b)=>a.time_result-b.time_result);
+  for (let i=0; i<sorted.length; i++) {
+    const pts = i===0 ? taskPoints : 0;
+    await db.from('submissions').update({points_awarded:pts}).eq('id',sorted[i].id);
+    const {data: teamSubs} = await db.from('submissions').select('points_awarded').eq('team_id',sorted[i].team_id).eq('status','approved');
+    const total = (teamSubs||[]).reduce((a,s)=>a+(s.points_awarded||0),0);
+    await db.from('teams').update({score:total}).eq('id',sorted[i].team_id);
+  }
+
+  document.getElementById('sub-'+subId)?.remove();
+  showToast(`⏱️ Tid lagret for ${teamName}! Poeng beregnet automatisk.`);
+}
+
+async function adminDeleteSubmission(subId) {
+  if (!confirm('Slett innlevering og fjern poeng?')) return;
+  const {data: sub} = await db.from('submissions').select('team_id,task_id,points_awarded').eq('id',subId).single();
+  await db.from('submissions').delete().eq('id',subId);
+  if (sub?.team_id) {
+    const {data: remaining} = await db.from('submissions').select('points_awarded').eq('team_id',sub.team_id).eq('status','approved');
+    const total = (remaining||[]).reduce((a,s)=>a+(s.points_awarded||0),0);
+    await db.from('teams').update({score:total}).eq('id',sub.team_id);
+  }
+  document.getElementById('sub-'+subId)?.remove();
+  showToast('Innlevering slettet og poeng fjernet.');
 }
 
 async function loadScoreboard() {
@@ -975,9 +1106,10 @@ async function loadManageData() {
       <div><div class="manage-item-name">${t.name}</div><div class="manage-item-sub">pw: ${t.password_hash} · ${t.score||0}p</div></div>
       <button class="btn-danger-sm" onclick="deleteTeam('${t.id}')">Slett</button>
     </div>`).join('');
-  document.getElementById('manage-tasks-list').innerHTML=(tasks||[]).map(t=>`
+  const typeLabel = {normal:'', timed:' ⏱️', multiple:' 📹'};
+  document.getElementById('manage-tasks-list').innerHTML=(tasks||[]).map((t,i)=>`
     <div class="manage-item">
-      <div><div class="manage-item-name">${t.title}</div><div class="manage-item-sub">${t.points} poeng${t.description?' · '+t.description:''}</div></div>
+      <div><div class="manage-item-name">${i+1}. ${t.title}${typeLabel[t.task_type]||''}</div><div class="manage-item-sub">${t.points} poeng${t.description?' · '+t.description:''}</div></div>
       <button class="btn-danger-sm" onclick="deleteTask('${t.id}')">Slett</button>
     </div>`).join('');
 }
@@ -998,14 +1130,17 @@ async function addTask() {
   const title=document.getElementById('new-task-title').value.trim();
   const description=document.getElementById('new-task-desc').value.trim();
   const points=parseInt(document.getElementById('new-task-points').value)||10;
+  const task_type=document.getElementById('new-task-type').value||'normal';
   if(!title){showToast('Fyll inn oppgavetittel');return;}
-  const {error}=await db.from('tasks').insert({title,description,points});
+  const {error}=await db.from('tasks').insert({title,description,points,task_type});
   if(error){showToast('Feil: '+error.message);return;}
   document.getElementById('new-task-title').value='';
   document.getElementById('new-task-desc').value='';
   document.getElementById('new-task-points').value='';
+  document.getElementById('new-task-type').value='normal';
   showToast('Oppgave lagt til!');
   loadManageData();
+  loadAdminTaskList();
 }
 
 async function deleteTeam(id) {
