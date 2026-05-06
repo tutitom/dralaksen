@@ -739,20 +739,23 @@ const B2_PUBLIC_URL = 'https://f003.backblazeb2.com/file/dralaksen';
 
 async function uploadToB2(file) {
   const ext = file.name.split('.').pop();
-  const key = `${currentTeam.id}/${currentTaskId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  const credentials = btoa(`${B2_KEY_ID}:${B2_APP_KEY}`);
+  const fileName = `${currentTeam.id}/${currentTaskId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
-  const res = await fetch(`${B2_ENDPOINT}/${B2_BUCKET}/${key}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': file.type,
-    },
-    body: file,
+  const base64 = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.readAsDataURL(file);
   });
 
-  if (!res.ok) throw new Error('B2 upload feilet');
-  return `${B2_PUBLIC_URL}/${key}`;
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileName, contentType: file.type, body: base64 }),
+  });
+
+  if (!res.ok) throw new Error('Upload feilet');
+  const { url } = await res.json();
+  return url;
 }
 
 let currentTeam = null, currentTaskId = null, selectedFile = null, isAdmin = false;
