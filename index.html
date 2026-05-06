@@ -600,7 +600,7 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
   display: none; align-items: center; justify-content: center;
 }
 #bubble-lightbox.open { display: flex; }
-#bubble-lightbox img {
+#bubble-lightbox video {
   max-width: 92vw; max-height: 88vh;
   border-radius: 14px;
   object-fit: contain;
@@ -783,7 +783,7 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
 <!-- Floating bubble -->
 <div id="floating-bubble" onclick="openBubblePhoto()" title="Trykk meg!">🐟</div>
 <div id="bubble-lightbox" onclick="closeBubblePhoto()">
-  <img src="photo.jpg" alt="Overraskelse!">
+  <video id="bubble-video" src="video.mp4" playsinline></video>
 </div>
 
 <script>
@@ -1356,9 +1356,15 @@ async function saveTidTime(taskId, teamId, taskPoints, teamName) {
 
 function openBubblePhoto() {
   document.getElementById('bubble-lightbox').classList.add('open');
+  const v = document.getElementById('bubble-video');
+  v.currentTime = 0;
+  v.play();
 }
 function closeBubblePhoto() {
   document.getElementById('bubble-lightbox').classList.remove('open');
+  const v = document.getElementById('bubble-video');
+  v.pause();
+  v.currentTime = 0;
 }
 
 async function init() { await seedData(); await loadTeamSelect(); }
