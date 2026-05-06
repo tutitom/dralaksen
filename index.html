@@ -566,6 +566,57 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
   transition: all 0.15s;
 }
 .filter-btn.active { background: var(--slate-dark); color: white; border-color: var(--slate-dark); }
+
+/* Floating bubble */
+#floating-bubble {
+  position: fixed;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff8e1, #fde8ec 60%, #e2d4f0);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18), inset 0 -3px 8px rgba(255,255,255,0.5);
+  cursor: pointer;
+  z-index: 9998;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  animation: bubbleMove 18s ease-in-out infinite;
+  user-select: none;
+  transition: transform 0.15s;
+}
+#floating-bubble:active { transform: scale(0.88); }
+@keyframes bubbleMove {
+  0%   { left: 8%;  top: 18%; }
+  15%  { left: 72%; top: 10%; }
+  30%  { left: 82%; top: 55%; }
+  45%  { left: 55%; top: 80%; }
+  60%  { left: 12%; top: 72%; }
+  75%  { left: 5%;  top: 38%; }
+  88%  { left: 40%; top: 12%; }
+  100% { left: 8%;  top: 18%; }
+}
+#bubble-lightbox {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.82);
+  z-index: 9999;
+  display: none; align-items: center; justify-content: center;
+}
+#bubble-lightbox.open { display: flex; }
+#bubble-lightbox img {
+  max-width: 92vw; max-height: 88vh;
+  border-radius: 14px;
+  object-fit: contain;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+/* Tid-fane styles */
+.tid-task-card { background: white; border-radius: var(--radius); border: 1.5px solid var(--border); margin-bottom: 18px; overflow: hidden; }
+.tid-task-header { padding: 14px 16px; border-bottom: 1.5px solid var(--border); font-family: var(--font-display); font-size: 15px; color: var(--slate-dark); display: flex; align-items: center; gap: 8px; }
+.tid-team-row { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
+.tid-team-row:last-child { border-bottom: none; }
+.tid-team-name { font-size: 14px; font-weight: 500; min-width: 110px; }
+.tid-current { font-size: 13px; color: var(--muted); min-width: 70px; }
+.tid-rank { font-size: 16px; min-width: 28px; }
+.tid-input { padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--border); font-size: 13px; width: 100px; }
+.tid-save-btn { padding: 6px 14px; border-radius: 8px; background: var(--slate-dark); color: white; border: none; font-size: 13px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -655,6 +706,7 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
       <button class="admin-tab active" onclick="switchTab('submissions', this)">⏳ Innleveringer</button>
       <button class="admin-tab" onclick="switchTab('scoreboard', this)">🏆 Poeng</button>
       <button class="admin-tab" onclick="switchTab('manage', this)">⚙️ Administrer</button>
+      <button class="admin-tab" onclick="switchTab('tid', this)">⏱️ Tid</button>
     </div>
 
     <div class="admin-section active" id="tab-submissions">
@@ -670,6 +722,10 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
 
     <div class="admin-section" id="tab-scoreboard">
       <div class="score-table" id="scoreboard-list"><div class="loading"><div class="spinner"></div>Laster...</div></div>
+    </div>
+
+    <div class="admin-section" id="tab-tid">
+      <div id="tid-list"><div class="loading"><div class="spinner"></div>Laster...</div></div>
     </div>
 
     <div class="admin-section" id="tab-manage">
@@ -722,6 +778,12 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
     </div>
     <div class="error-msg" id="upload-error"></div>
   </div>
+</div>
+
+<!-- Floating bubble -->
+<div id="floating-bubble" onclick="openBubblePhoto()" title="Trykk meg!">🐟</div>
+<div id="bubble-lightbox" onclick="closeBubblePhoto()">
+  <img src="photo.jpg" alt="Overraskelse!">
 </div>
 
 <script>
@@ -886,24 +948,45 @@ function openUpload(taskId, taskName, taskPoints, taskDesc, taskType) {
 function closeModal() { document.getElementById('upload-modal').classList.remove('open'); }
 
 function handleFileSelect(input) {
-  const files = Array.from(input.files);
-  if (!files.length) return;
-  const tooBig = files.find(f => f.size > 50*1024*1024);
+  const newFiles = Array.from(input.files);
+  if (!newFiles.length) return;
+  const tooBig = newFiles.find(f => f.size > 50*1024*1024);
   if (tooBig) {
     document.getElementById('upload-error').textContent=`${tooBig.name} er for stor (maks 50MB).`;
     document.getElementById('upload-error').style.display='block'; return;
   }
-  selectedFiles = files;
-  selectedFile = files[0];
-  const previews = document.getElementById('upload-previews');
-  previews.innerHTML = files.map(f => {
-    const url = URL.createObjectURL(f);
-    if (f.type.startsWith('image/')) return `<img src="${url}" class="upload-preview" style="display:block;width:100%;border-radius:10px;margin-bottom:6px">`;
-    return `<video src="${url}" class="upload-preview" controls style="display:block;width:100%;border-radius:10px;margin-bottom:6px"></video>`;
-  }).join('');
+  if (currentAllowMultiple) {
+    selectedFiles = [...selectedFiles, ...newFiles];
+  } else {
+    selectedFiles = newFiles;
+  }
+  selectedFile = selectedFiles[0];
+  input.value = '';
+  renderUploadPreviews();
   document.getElementById('upload-zone').style.display = currentAllowMultiple ? 'block' : 'none';
   document.getElementById('submit-btn').disabled = false;
   document.getElementById('upload-error').style.display = 'none';
+}
+
+function renderUploadPreviews() {
+  const previews = document.getElementById('upload-previews');
+  previews.innerHTML = selectedFiles.map((f, i) => {
+    const url = URL.createObjectURL(f);
+    const media = f.type.startsWith('image/')
+      ? `<img src="${url}" style="display:block;width:100%;border-radius:10px;margin-bottom:4px">`
+      : `<video src="${url}" controls style="display:block;width:100%;border-radius:10px;margin-bottom:4px"></video>`;
+    const removeBtn = currentAllowMultiple
+      ? `<button onclick="removeSelectedFile(${i})" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:16px;line-height:26px;cursor:pointer">×</button>`
+      : '';
+    return `<div style="position:relative;margin-bottom:8px">${media}${removeBtn}</div>`;
+  }).join('');
+}
+
+function removeSelectedFile(index) {
+  selectedFiles.splice(index, 1);
+  selectedFile = selectedFiles[0] || null;
+  if (!selectedFiles.length) document.getElementById('submit-btn').disabled = true;
+  renderUploadPreviews();
 }
 
 async function submitProof() {
@@ -941,6 +1024,7 @@ function switchTab(tab, btn) {
   if (tab==='submissions') { loadAdminSubmissions(); loadAdminTaskList(); }
   if (tab==='scoreboard') loadScoreboard();
   if (tab==='manage') loadManageData();
+  if (tab==='tid') loadTidTab();
 }
 
 function setFilter(filter, btn) {
@@ -1206,6 +1290,75 @@ async function seedData() {
   ];
   await db.from('teams').insert(teams);
   await db.from('tasks').insert(tasks);
+}
+
+async function loadTidTab() {
+  const list = document.getElementById('tid-list');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div>Laster...</div>';
+  const [{data: tasks}, {data: teams}, {data: subs}] = await Promise.all([
+    db.from('tasks').select('*').eq('task_type','timed').order('created_at'),
+    db.from('teams').select('id,name').order('name'),
+    db.from('submissions').select('id,team_id,task_id,time_result,status').eq('status','approved')
+  ]);
+  if (!tasks || tasks.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏱️</div><div class="empty-state-text">Ingen tidsoppgaver opprettet ennå.</div></div>';
+    return;
+  }
+  const medals = ['🥇','🥈','🥉'];
+  list.innerHTML = (tasks||[]).map(task => {
+    const taskSubs = (subs||[]).filter(s => s.task_id === task.id && s.time_result != null);
+    const sorted = [...taskSubs].sort((a,b) => a.time_result - b.time_result);
+    const rankMap = {};
+    sorted.forEach((s, i) => { rankMap[s.team_id] = i; });
+    const rows = (teams||[]).map(team => {
+      const sub = taskSubs.find(s => s.team_id === team.id);
+      const rank = sub ? rankMap[team.id] : null;
+      const rankBadge = rank != null ? (medals[rank] || `#${rank+1}`) : '–';
+      const currentTime = sub ? `<span class="tid-current">${formatTime2(sub.time_result)}</span>` : `<span class="tid-current">–</span>`;
+      const subId = sub ? sub.id : null;
+      return `<div class="tid-team-row">
+        <span class="tid-rank">${rankBadge}</span>
+        <span class="tid-team-name">${team.name}</span>
+        ${currentTime}
+        <input type="number" class="tid-input" id="tid-input-${task.id}-${team.id}" placeholder="sekunder" value="${sub ? sub.time_result : ''}" min="0" step="0.01">
+        <button class="tid-save-btn" onclick="saveTidTime('${task.id}','${team.id}',${task.points},'${team.name}')">Lagre</button>
+      </div>`;
+    }).join('');
+    return `<div class="tid-task-card">
+      <div class="tid-task-header">⏱️ ${task.title} &nbsp;·&nbsp; ${task.points} poeng</div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+async function saveTidTime(taskId, teamId, taskPoints, teamName) {
+  const input = document.getElementById(`tid-input-${taskId}-${teamId}`);
+  const timeVal = parseFloat(input?.value);
+  if (isNaN(timeVal) || timeVal <= 0) { showToast('Legg inn gyldig tid i sekunder'); return; }
+  await db.from('submissions').upsert({
+    team_id: teamId, task_id: taskId,
+    time_result: timeVal, status: 'approved', points_awarded: 0,
+    submitted_at: new Date().toISOString(), file_url: null
+  }, {onConflict: 'team_id,task_id'});
+  const {data: taskSubs} = await db.from('submissions')
+    .select('id,team_id,time_result').eq('task_id', taskId).eq('status','approved');
+  const sorted = (taskSubs||[]).filter(s=>s.time_result!=null).sort((a,b)=>a.time_result-b.time_result);
+  for (let i=0; i<sorted.length; i++) {
+    const pts = i===0 ? taskPoints : 0;
+    await db.from('submissions').update({points_awarded:pts}).eq('id',sorted[i].id);
+    const {data: teamSubs} = await db.from('submissions').select('points_awarded').eq('team_id',sorted[i].team_id).eq('status','approved');
+    const total = (teamSubs||[]).reduce((a,s)=>a+(s.points_awarded||0),0);
+    await db.from('teams').update({score:total}).eq('id',sorted[i].team_id);
+  }
+  showToast(`⏱️ Tid lagret for ${teamName}!`);
+  loadTidTab();
+}
+
+function openBubblePhoto() {
+  document.getElementById('bubble-lightbox').classList.add('open');
+}
+function closeBubblePhoto() {
+  document.getElementById('bubble-lightbox').classList.remove('open');
 }
 
 async function init() { await seedData(); await loadTeamSelect(); }
