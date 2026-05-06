@@ -731,6 +731,30 @@ const ADMIN_PASSWORD = 'arsenalerbest67';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const B2_KEY_ID = '0034de84bd5569e0000000001';       
+const B2_APP_KEY = '0035b1a96d7e5ac24653f1b2be1e7d91362e9682f9';     
+const B2_BUCKET = 'dralaksen';
+const B2_ENDPOINT = 'https://s3.eu-central-003.backblazeb2.com';
+const B2_PUBLIC_URL = 'https://f003.backblazeb2.com/file/dralaksen';
+
+async function uploadToB2(file) {
+  const ext = file.name.split('.').pop();
+  const key = `${currentTeam.id}/${currentTaskId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const credentials = btoa(`${B2_KEY_ID}:${B2_APP_KEY}`);
+
+  const res = await fetch(`${B2_ENDPOINT}/${B2_BUCKET}/${key}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Basic ${credentials}`,
+      'Content-Type': file.type,
+    },
+    body: file,
+  });
+
+  if (!res.ok) throw new Error('B2 upload feilet');
+  return `${B2_PUBLIC_URL}/${key}`;
+}
+
 let currentTeam = null, currentTaskId = null, selectedFile = null, isAdmin = false;
 let currentFilter = 'pending', currentTaskFilter = null, currentSubMap = {}, selectedFiles = [], currentAllowMultiple = false;
 
@@ -887,17 +911,15 @@ async function submitProof() {
   btn.disabled=true; btn.textContent='Laster opp...';
   const urls = [];
   for (const file of selectedFiles) {
-    const ext = file.name.split('.').pop();
-    const path = `${currentTeam.id}/${currentTaskId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: uploadError } = await db.storage.from('proofs').upload(path, file, {upsert:true});
-    if (uploadError) {
-      document.getElementById('upload-error').textContent='Feil ved opplasting. Prøv igjen.';
-      document.getElementById('upload-error').style.display='block';
-      btn.disabled=false; btn.textContent='Last opp 🐟'; return;
-    }
-    const { data: urlData } = db.storage.from('proofs').getPublicUrl(path);
-    urls.push(urlData.publicUrl);
+  try {
+    const url = await uploadToB2(file);
+    urls.push(url);
+  } catch (e) {
+    document.getElementById('upload-error').textContent='Feil ved opplasting. Prøv igjen.';
+    document.getElementById('upload-error').style.display='block';
+    btn.disabled=false; btn.textContent='Last opp 🐟'; return;
   }
+}
   const fileUrl = urls.length === 1 ? urls[0] : JSON.stringify(urls);
   await db.from('submissions').upsert({
     team_id: currentTeam.id, task_id: currentTaskId,
