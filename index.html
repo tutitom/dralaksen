@@ -842,7 +842,10 @@ async function uploadToB2(file) {
     headers: { 'Content-Type': contentType },
     body: file,
   });
-  if (!uploadRes.ok) throw new Error('Opplasting til B2 feilet');
+  if (!uploadRes.ok) {
+    const errText = await uploadRes.text().catch(() => '');
+    throw new Error(`B2 feil ${uploadRes.status}: ${errText.slice(0, 200)}`);
+  }
 
   return publicUrl;
 }
@@ -1028,7 +1031,7 @@ async function submitProof() {
     const url = await uploadToB2(file);
     urls.push(url);
   } catch (e) {
-    document.getElementById('upload-error').textContent='Feil ved opplasting. Prøv igjen.';
+    document.getElementById('upload-error').textContent=`Feil: ${e.message}`;
     document.getElementById('upload-error').style.display='block';
     btn.disabled=false; btn.textContent='Last opp 🐟'; return;
   }

@@ -20,7 +20,6 @@ export default async function handler(req, res) {
     const command = new PutObjectCommand({
       Bucket: 'dralaksen',
       Key: fileName,
-      ContentType: contentType,
     });
 
     const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
