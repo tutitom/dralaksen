@@ -783,8 +783,10 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
 <!-- Floating bubble -->
 <div id="floating-bubble" onclick="openBubblePhoto()" title="Trykk meg!">🐟</div>
 <div id="bubble-lightbox" onclick="closeBubblePhoto()">
-  <video id="bubble-video" src="video.mp4" playsinline></video>
+  <button onclick="event.stopPropagation(); closeBubblePhoto()" style="position:fixed;top:16px;right:16px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:20px;line-height:36px;cursor:pointer;z-index:10000">×</button>
+  <video id="bubble-video" src="video.mp4" playsinline loop onclick="event.stopPropagation()"></video>
 </div>
+<audio id="bg-music" src="music.mp3" loop></audio>
 
 <script>
 const SUPABASE_URL = 'https://pbwyicmejibrlpsvqglr.supabase.co';
@@ -1359,6 +1361,8 @@ function openBubblePhoto() {
   const v = document.getElementById('bubble-video');
   v.currentTime = 0;
   v.play();
+  const a = document.getElementById('bg-music');
+  if (a.paused) a.play();
 }
 function closeBubblePhoto() {
   document.getElementById('bubble-lightbox').classList.remove('open');
