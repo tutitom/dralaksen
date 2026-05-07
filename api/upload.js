@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       ContentType: contentType,
     });
 
-    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
 
     res.json({
       presignedUrl,

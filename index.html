@@ -787,7 +787,7 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
       <input type="file" id="file-input" accept="image/*,video/*" onchange="handleFileSelect(this)">
       <div class="upload-zone-icon">📷</div>
       <div class="upload-zone-text" id="upload-zone-text">Trykk for å velge bilde eller video</div>
-      <div class="upload-zone-hint">JPG, PNG, MP4, MOV – maks 50MB</div>
+      <div class="upload-zone-hint">JPG, PNG, HEIC, MP4, MOV – maks 300MB</div>
     </div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeModal()">Avbryt</button>
@@ -815,21 +815,31 @@ const B2_BUCKET = 'dralaksen';
 const B2_ENDPOINT = 'https://s3.eu-central-003.backblazeb2.com';
 const B2_PUBLIC_URL = 'https://f003.backblazeb2.com/file/dralaksen';
 
+function getContentType(file) {
+  if (file.type) return file.type;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const map = { heic: 'image/heic', heif: 'image/heif', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+    mp4: 'video/mp4', mov: 'video/quicktime', avi: 'video/x-msvideo', mkv: 'video/x-matroska' };
+  return map[ext] || 'application/octet-stream';
+}
+
 async function uploadToB2(file) {
   const ext = file.name.split('.').pop();
   const fileName = `${currentTeam.id}/${currentTaskId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const contentType = getContentType(file);
 
   const res = await fetch('/api/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileName, contentType: file.type }),
+    body: JSON.stringify({ fileName, contentType }),
   });
   if (!res.ok) throw new Error('Kunne ikke hente opplastingslenke');
   const { presignedUrl, publicUrl } = await res.json();
 
   const uploadRes = await fetch(presignedUrl, {
     method: 'PUT',
-    headers: { 'Content-Type': file.type },
+    headers: { 'Content-Type': contentType },
     body: file,
   });
   if (!uploadRes.ok) throw new Error('Opplasting til B2 feilet');
@@ -969,9 +979,9 @@ function closeModal() { document.getElementById('upload-modal').classList.remove
 function handleFileSelect(input) {
   const newFiles = Array.from(input.files);
   if (!newFiles.length) return;
-  const tooBig = newFiles.find(f => f.size > 50*1024*1024);
+  const tooBig = newFiles.find(f => f.size > 300*1024*1024);
   if (tooBig) {
-    document.getElementById('upload-error').textContent=`${tooBig.name} er for stor (maks 50MB).`;
+    document.getElementById('upload-error').textContent=`${tooBig.name} er for stor (maks 300MB).`;
     document.getElementById('upload-error').style.display='block'; return;
   }
   if (currentAllowMultiple) {
