@@ -819,21 +819,22 @@ async function uploadToB2(file) {
   const ext = file.name.split('.').pop();
   const fileName = `${currentTeam.id}/${currentTaskId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
-  const base64 = await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.readAsDataURL(file);
-  });
-
   const res = await fetch('/api/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileName, contentType: file.type, body: base64 }),
+    body: JSON.stringify({ fileName, contentType: file.type }),
   });
+  if (!res.ok) throw new Error('Kunne ikke hente opplastingslenke');
+  const { presignedUrl, publicUrl } = await res.json();
 
-  if (!res.ok) throw new Error('Upload feilet');
-  const { url } = await res.json();
-  return url;
+  const uploadRes = await fetch(presignedUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  });
+  if (!uploadRes.ok) throw new Error('Opplasting til B2 feilet');
+
+  return publicUrl;
 }
 
 let currentTeam = null, currentTaskId = null, selectedFile = null, isAdmin = false;

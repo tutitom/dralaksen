@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3 = new S3Client({
   region: "auto",
@@ -12,19 +13,22 @@ const s3 = new S3Client({
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { fileName, contentType, body } = req.body;
-
-  const buffer = Buffer.from(body, 'base64');
+  const { fileName, contentType } = req.body;
+  if (!fileName || !contentType) return res.status(400).json({ error: 'Mangler fileName eller contentType' });
 
   try {
-    await s3.send(new PutObjectCommand({
+    const command = new PutObjectCommand({
       Bucket: 'dralaksen',
       Key: fileName,
-      Body: buffer,
       ContentType: contentType,
-    }));
+    });
 
-    res.json({ url: `https://f003.backblazeb2.com/file/dralaksen/${fileName}` });
+    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+
+    res.json({
+      presignedUrl,
+      publicUrl: `https://f003.backblazeb2.com/file/dralaksen/${fileName}`,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
