@@ -567,32 +567,19 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
 }
 .filter-btn.active { background: var(--slate-dark); color: white; border-color: var(--slate-dark); }
 
-/* Floating bubble */
-#floating-bubble {
-  position: fixed;
-  width: 52px; height: 52px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff8e1, #fde8ec 60%, #e2d4f0);
-  box-shadow: 0 4px 18px rgba(0,0,0,0.18), inset 0 -3px 8px rgba(255,255,255,0.5);
+/* Video button */
+#video-btn {
+  background: none;
+  border: none;
   cursor: pointer;
-  z-index: 9998;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 26px;
-  animation: bubbleMove 18s ease-in-out infinite;
-  user-select: none;
-  transition: transform 0.15s;
+  opacity: 0.45;
+  font-size: 15px;
+  padding: 4px;
+  line-height: 1;
+  transition: opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
-#floating-bubble:active { transform: scale(0.88); }
-@keyframes bubbleMove {
-  0%   { left: 8%;  top: 18%; }
-  15%  { left: 72%; top: 10%; }
-  30%  { left: 82%; top: 55%; }
-  45%  { left: 55%; top: 80%; }
-  60%  { left: 12%; top: 72%; }
-  75%  { left: 5%;  top: 38%; }
-  88%  { left: 40%; top: 12%; }
-  100% { left: 8%;  top: 18%; }
-}
+#video-btn:hover { opacity: 0.75; }
 #bubble-lightbox {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.82);
@@ -688,6 +675,7 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
     </div>
     <div class="header-right">
       <div class="team-badge" id="team-name-badge"></div>
+      <button id="video-btn" onclick="openBubblePhoto()" title="Se video">▶</button>
       <button class="btn-logout" onclick="logout()">Logg ut</button>
     </div>
   </div>
@@ -798,7 +786,6 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
 </div>
 
 <!-- Floating bubble -->
-<div id="floating-bubble" onclick="openBubblePhoto()" title="Trykk meg!">🐟</div>
 <div id="bubble-lightbox" onclick="closeBubblePhoto()">
   <button id="bubble-close-btn" onclick="event.stopPropagation(); closeBubblePhoto()">×</button>
   <video id="bubble-video" src="video.mp4" playsinline loop onclick="event.stopPropagation()"></video>
