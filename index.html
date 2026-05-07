@@ -598,13 +598,30 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
   background: rgba(0,0,0,0.82);
   z-index: 9999;
   display: none; align-items: center; justify-content: center;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
 }
 #bubble-lightbox.open { display: flex; }
 #bubble-lightbox video {
-  max-width: 92vw; max-height: 88vh;
+  max-width: 92vw; max-height: 80vh;
   border-radius: 14px;
   object-fit: contain;
   box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+#bubble-close-btn {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top, 16px));
+  right: 16px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 44px; height: 44px;
+  font-size: 22px;
+  line-height: 44px;
+  cursor: pointer;
+  z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Tid-fane styles */
@@ -783,10 +800,9 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
 <!-- Floating bubble -->
 <div id="floating-bubble" onclick="openBubblePhoto()" title="Trykk meg!">🐟</div>
 <div id="bubble-lightbox" onclick="closeBubblePhoto()">
-  <button onclick="event.stopPropagation(); closeBubblePhoto()" style="position:fixed;top:16px;right:16px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:20px;line-height:36px;cursor:pointer;z-index:10000">×</button>
+  <button id="bubble-close-btn" onclick="event.stopPropagation(); closeBubblePhoto()">×</button>
   <video id="bubble-video" src="video.mp4" playsinline loop onclick="event.stopPropagation()"></video>
 </div>
-<audio id="bg-music" src="music.mp3" loop></audio>
 
 <script>
 const SUPABASE_URL = 'https://pbwyicmejibrlpsvqglr.supabase.co';
@@ -1361,8 +1377,6 @@ function openBubblePhoto() {
   const v = document.getElementById('bubble-video');
   v.currentTime = 0;
   v.play();
-  const a = document.getElementById('bg-music');
-  if (a.paused) a.play();
 }
 function closeBubblePhoto() {
   document.getElementById('bubble-lightbox').classList.remove('open');
