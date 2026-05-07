@@ -1151,20 +1151,13 @@ async function loadAdminSubmissions() {
   }).join('');
 }
 
-async function recalcTeamScore(teamId) {
-  const [{ data: subs }, { data: team }] = await Promise.all([
-    db.from('submissions').select('points_awarded').eq('team_id', teamId).eq('status', 'approved'),
-    db.from('teams').select('bonus_points').eq('id', teamId).single(),
-  ]);
-  const total = (subs||[]).reduce((a,s)=>a+(s.points_awarded||0),0) + (team?.bonus_points||0);
-  await db.from('teams').update({score:total}).eq('id', teamId);
-}
-
 async function approveSubmission(id, teamName) {
   const pts = parseInt(document.getElementById('pts-'+id)?.value)||0;
   const { data: sub } = await db.from('submissions').select('team_id').eq('id',id).single();
   await db.from('submissions').update({status:'approved',points_awarded:pts}).eq('id',id);
-  await recalcTeamScore(sub.team_id);
+  const { data: subs } = await db.from('submissions').select('points_awarded').eq('team_id',sub.team_id).eq('status','approved');
+  const total = (subs||[]).reduce((a,s)=>a+(s.points_awarded||0),0);
+  await db.from('teams').update({score:total}).eq('id',sub.team_id);
   // Remove card from DOM immediately
   document.getElementById('sub-'+id)?.remove();
   showToast(`✓ Godkjent for ${teamName}! +${pts} poeng`);
@@ -1218,27 +1211,24 @@ async function adminDeleteSubmission(subId) {
 
 async function loadScoreboard() {
   const list = document.getElementById('scoreboard-list');
-  const { data: teams } = await db.from('teams').select('id,name,score,bonus_points').order('score',{ascending:false});
+  const { data: teams } = await db.from('teams').select('id,name,score').order('score',{ascending:false});
   if (!teams||teams.length===0) { list.innerHTML='<div class="empty-state">Ingen lag</div>'; return; }
   const medals = ['🥇','🥈','🥉'];
   list.innerHTML = teams.map((t,i)=>`
-    <div class="score-row ${i===0?'gold':''}" id="scorerow-${t.id}">
+    <div class="score-row ${i===0?'gold':''}">
       <div class="score-rank">${medals[i]||(i+1)}</div>
       <div class="score-name">${t.name}</div>
-      <div class="score-pts">${t.score||0}</div>
-      <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
-        <button onclick="adjustBonus('${t.id}',-1)" style="width:28px;height:28px;border-radius:6px;border:1.5px solid #e2e8f0;background:#fff;font-size:16px;cursor:pointer;line-height:1">−</button>
-        <span style="font-size:12px;color:#6b7280;min-width:60px;text-align:center">bonus: ${t.bonus_points||0}</span>
-        <button onclick="adjustBonus('${t.id}',1)" style="width:28px;height:28px;border-radius:6px;border:1.5px solid #e2e8f0;background:#fff;font-size:16px;cursor:pointer;line-height:1">+</button>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+        <input id="score-input-${t.id}" type="number" value="${t.score||0}" style="width:70px;padding:4px 8px;border-radius:8px;border:1.5px solid #e2e8f0;font-size:14px;text-align:center">
+        <button onclick="saveScore('${t.id}')" style="padding:4px 10px;border-radius:8px;background:var(--slate-dark);color:#fff;border:none;font-size:13px;cursor:pointer">Lagre</button>
       </div>
     </div>`).join('');
 }
 
-async function adjustBonus(teamId, delta) {
-  const { data: team } = await db.from('teams').select('bonus_points').eq('id', teamId).single();
-  const newBonus = (team?.bonus_points||0) + delta;
-  await db.from('teams').update({bonus_points: newBonus}).eq('id', teamId);
-  await recalcTeamScore(teamId);
+async function saveScore(teamId) {
+  const val = parseInt(document.getElementById('score-input-'+teamId)?.value) || 0;
+  await db.from('teams').update({score: val}).eq('id', teamId);
+  showToast('Poengsum oppdatert');
   loadScoreboard();
 }
 
