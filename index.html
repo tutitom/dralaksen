@@ -756,6 +756,7 @@ body { font-family: var(--font-body); background: var(--pink-light); color: var(
               <option value="timed">Tidsoppgave ⏱️</option>
               <option value="multiple">Flervideooppgave 📹</option>
             </select>
+            <input type="number" id="new-task-attempts" placeholder="Maks innleveringer (standard 1)" min="1" style="padding:8px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;width:100%">
             <button class="btn-add" onclick="addTask()">+ Legg til oppgave</button>
           </div>
         </div>
@@ -905,21 +906,51 @@ async function loadTeamTasks() {
   const rank = (allTeams||[]).findIndex(t=>t.id===currentTeam.id)+1;
   document.getElementById('team-rank').textContent = rank>0 ? `#${rank} av ${(allTeams||[]).length} lag` : '';
   currentSubMap = {};
-  (subs||[]).forEach(s => { currentSubMap[s.task_id] = s; });
+  (subs||[]).forEach(s => {
+    if (!currentSubMap[s.task_id]) currentSubMap[s.task_id] = [];
+    currentSubMap[s.task_id].push(s);
+  });
   if (!tasks||tasks.length===0) {
     list.innerHTML='<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">Ingen oppgaver ennå</div></div>';
     return;
   }
   const statusLabels = { none:'Ikke levert', pending:'Venter på godkjenning', approved:'✓ Godkjent', rejected:'✗ Avvist – last opp på nytt' };
   list.innerHTML = tasks.map(task => {
-    const sub = currentSubMap[task.id];
-    const status = sub ? sub.status : 'none';
-    const cardClass = status==='approved'?'done':status==='pending'?'pending':status==='rejected'?'rejected':'';
-    const canUpload = status==='none'||status==='rejected';
+    const taskSubs = currentSubMap[task.id] || [];
+    const maxAttempts = task.max_attempts || 1;
     const safeTitle = task.title.replace(/'/g,"\\'");
     const safeDesc = (task.description||'').replace(/'/g,"\\'");
     const taskType = task.task_type||'normal';
-    const typeIcon = taskType==='timed'?' ⏱️':taskType==='multiple'?' 📹':'';
+    const typeIcon = taskType==='timed'?' ⏱️':taskType==='multiple'?' 📹':maxAttempts>1?' 🔁':'';
+
+    if (maxAttempts > 1) {
+      const approvedCount = taskSubs.filter(s=>s.status==='approved').length;
+      const hasPending = taskSubs.some(s=>s.status==='pending');
+      const canUpload = approvedCount < maxAttempts && !hasPending;
+      const nextAttempt = approvedCount + 1;
+      const cardClass = hasPending?'pending':approvedCount>0?'done':'';
+      const statusText = hasPending
+        ? `${approvedCount} / ${maxAttempts} godkjent · 1 venter på godkjenning`
+        : approvedCount > 0
+          ? `${approvedCount} / ${maxAttempts} godkjent`
+          : `0 / ${maxAttempts} – ikke levert ennå`;
+      return `<div class="task-card ${cardClass}">
+        <div class="task-points">${task.points}</div>
+        <div class="task-info">
+          <div class="task-name">${task.title}${typeIcon}</div>
+          ${task.description?`<div class="task-desc">${task.description}</div>`:''}
+          <span class="task-status status-${hasPending?'pending':approvedCount>0?'approved':'none'}">${statusText}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
+          ${canUpload?`<button class="btn-upload" onclick="openUpload('${task.id}','${safeTitle}',${task.points},'${safeDesc}','${taskType}',${maxAttempts},${nextAttempt})">Last opp #${nextAttempt}</button>`:''}
+        </div>
+      </div>`;
+    }
+
+    const sub = taskSubs[0];
+    const status = sub ? sub.status : 'none';
+    const cardClass = status==='approved'?'done':status==='pending'?'pending':status==='rejected'?'rejected':'';
+    const canUpload = status==='none'||status==='rejected';
     const timeInfo = status==='approved'&&taskType==='timed'&&sub?.time_result!=null?' · '+formatTime2(sub.time_result):'';
     return `<div class="task-card ${cardClass}">
       <div class="task-points">${task.points}</div>
@@ -929,8 +960,8 @@ async function loadTeamTasks() {
         <span class="task-status status-${status}">${statusLabels[status]}${timeInfo}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0">
-        ${canUpload?`<button class="btn-upload" onclick="openUpload('${task.id}','${safeTitle}',${task.points},'${safeDesc}','${taskType}')">Last opp</button>`:''}
-        ${status==='approved'?`<button class="btn-upload" style="background:#f59e0b;font-size:12px;padding:5px 10px" onclick="openUpload('${task.id}','${safeTitle}',${task.points},'${safeDesc}','${taskType}')">Endre</button><button class="btn-upload" style="background:#ef4444;font-size:12px;padding:5px 10px" onclick="deleteTeamSubmission('${task.id}')">Slett</button>`:''}
+        ${canUpload?`<button class="btn-upload" onclick="openUpload('${task.id}','${safeTitle}',${task.points},'${safeDesc}','${taskType}',1,1)">Last opp</button>`:''}
+        ${status==='approved'?`<button class="btn-upload" style="background:#f59e0b;font-size:12px;padding:5px 10px" onclick="openUpload('${task.id}','${safeTitle}',${task.points},'${safeDesc}','${taskType}',1,1)">Endre</button><button class="btn-upload" style="background:#ef4444;font-size:12px;padding:5px 10px" onclick="deleteTeamSubmission('${task.id}')">Slett</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -948,8 +979,9 @@ async function deleteTeamSubmission(taskId) {
   loadTeamTasks();
 }
 
-function openUpload(taskId, taskName, taskPoints, taskDesc, taskType) {
-  currentTaskId = taskId; selectedFile = null; selectedFiles = [];
+let currentAttemptNumber = 1;
+function openUpload(taskId, taskName, taskPoints, taskDesc, taskType, maxAttempts=1, attemptNumber=1) {
+  currentTaskId = taskId; selectedFile = null; selectedFiles = []; currentAttemptNumber = attemptNumber;
   currentAllowMultiple = (taskType||'normal') === 'multiple';
   document.getElementById('modal-task-name').textContent = taskName;
   document.getElementById('modal-task-pts').textContent = (taskDesc||'') + (taskDesc?' · ':'') + taskPoints + ' poeng';
@@ -1027,8 +1059,9 @@ async function submitProof() {
   await db.from('submissions').upsert({
     team_id: currentTeam.id, task_id: currentTaskId,
     file_url: fileUrl, status:'pending', points_awarded:0,
+    attempt_number: currentAttemptNumber,
     submitted_at: new Date().toISOString()
-  }, {onConflict:'team_id,task_id'});
+  }, {onConflict:'team_id,task_id,attempt_number'});
   closeModal();
   showToast('Bevis lastet opp! Venter på godkjenning 🐟');
   loadTeamTasks();
@@ -1267,8 +1300,9 @@ async function addTask() {
   const description=document.getElementById('new-task-desc').value.trim();
   const points=parseInt(document.getElementById('new-task-points').value)||10;
   const task_type=document.getElementById('new-task-type').value||'normal';
+  const max_attempts=parseInt(document.getElementById('new-task-attempts').value)||1;
   if(!title){showToast('Fyll inn oppgavetittel');return;}
-  const {error}=await db.from('tasks').insert({title,description,points,task_type});
+  const {error}=await db.from('tasks').insert({title,description,points,task_type,max_attempts});
   if(error){showToast('Feil: '+error.message);return;}
   document.getElementById('new-task-title').value='';
   document.getElementById('new-task-desc').value='';
