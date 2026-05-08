@@ -1146,9 +1146,17 @@ async function loadAdminSubmissions() {
         <button class="btn-reject" onclick="rejectSubmission('${s.id}')">✗ Avvis</button>
       </div>`;
     } else if (isPending) {
+      const basePts = s.tasks?.points||0;
       actionsHtml = `<div class="submission-actions-row">
-        <div class="points-field"><label>Poeng:</label>
-          <input type="number" id="pts-${s.id}" value="${s.tasks?.points||10}" min="0">
+        <div class="points-field">
+          <label>Per innlevering:</label>
+          <input type="number" id="pts-${s.id}" value="${basePts}" min="0">
+        </div>
+        <div class="points-field" style="gap:4px">
+          <label>Bonus:</label>
+          <button onclick="adjustSubBonus('${s.id}',-1)" style="width:26px;height:26px;border-radius:6px;border:1.5px solid #e2e8f0;background:#fff;font-size:15px;cursor:pointer;line-height:1;flex-shrink:0">−</button>
+          <span id="bonus-${s.id}" style="min-width:24px;text-align:center;font-weight:600">0</span>
+          <button onclick="adjustSubBonus('${s.id}',1)" style="width:26px;height:26px;border-radius:6px;border:1.5px solid #e2e8f0;background:#fff;font-size:15px;cursor:pointer;line-height:1;flex-shrink:0">+</button>
         </div>
         <button class="btn-approve" onclick="approveSubmission('${s.id}','${safeTeam}')">✓ Godkjenn</button>
         <button class="btn-reject" onclick="rejectSubmission('${s.id}')">✗ Avvis</button>
@@ -1184,8 +1192,16 @@ async function loadAdminSubmissions() {
   }).join('');
 }
 
+function adjustSubBonus(id, delta) {
+  const el = document.getElementById('bonus-'+id);
+  if (!el) return;
+  el.textContent = Math.max(0, (parseInt(el.textContent)||0) + delta);
+}
+
 async function approveSubmission(id, teamName) {
-  const pts = parseInt(document.getElementById('pts-'+id)?.value)||0;
+  const base = parseInt(document.getElementById('pts-'+id)?.value)||0;
+  const bonus = parseInt(document.getElementById('bonus-'+id)?.textContent)||0;
+  const pts = base + bonus;
   const { data: sub } = await db.from('submissions').select('team_id').eq('id',id).single();
   await db.from('submissions').update({status:'approved',points_awarded:pts}).eq('id',id);
   const { data: subs } = await db.from('submissions').select('points_awarded').eq('team_id',sub.team_id).eq('status','approved');
