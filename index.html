@@ -914,7 +914,7 @@ async function loadTeamTasks() {
     list.innerHTML='<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">Ingen oppgaver ennå</div></div>';
     return;
   }
-  const statusLabels = { none:'Ikke levert', pending:'Venter på godkjenning', approved:'✓ Godkjent', rejected:'✗ Avvist – last opp på nytt' };
+  const statusLabels = { none:'Ikke levert', pending:'Venter på godkjenning', approved:'✓ Godkjent', rejected:'✗ Avvist' };
   list.innerHTML = tasks.map(task => {
     const taskSubs = currentSubMap[task.id] || [];
     const maxAttempts = task.max_attempts || 1;
@@ -950,7 +950,7 @@ async function loadTeamTasks() {
     const sub = taskSubs[0];
     const status = sub ? sub.status : 'none';
     const cardClass = status==='approved'?'done':status==='pending'?'pending':status==='rejected'?'rejected':'';
-    const canUpload = status==='none'||status==='rejected';
+    const canUpload = status==='none';
     const timeInfo = status==='approved'&&taskType==='timed'&&sub?.time_result!=null?' · '+formatTime2(sub.time_result):'';
     return `<div class="task-card ${cardClass}">
       <div class="task-points">${task.points}</div>
