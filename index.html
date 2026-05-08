@@ -897,7 +897,7 @@ async function loadTeamTasks() {
   const list = document.getElementById('tasks-list');
   list.innerHTML = '<div class="loading"><div class="spinner"></div>Laster...</div>';
   const [{ data: tasks }, { data: subs }] = await Promise.all([
-    db.from('tasks').select('*').order('created_at'),
+    db.from('tasks').select('*').neq('task_type','timed').order('created_at'),
     db.from('submissions').select('*').eq('team_id', currentTeam.id)
   ]);
   const approvedPts = (subs||[]).filter(s=>s.status==='approved').reduce((a,s)=>a+(s.points_awarded||0),0);
