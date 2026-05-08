@@ -812,6 +812,25 @@ function getContentType(file) {
   return map[ext] || 'application/octet-stream';
 }
 
+function extractB2Keys(fileUrl) {
+  if (!fileUrl) return [];
+  const prefix = 'https://f003.backblazeb2.com/file/dralaksen/';
+  let urls;
+  try { urls = JSON.parse(fileUrl); } catch { urls = [fileUrl]; }
+  if (!Array.isArray(urls)) urls = [urls];
+  return urls.map(u => typeof u === 'string' && u.startsWith(prefix) ? u.slice(prefix.length) : null).filter(Boolean);
+}
+
+async function deleteFromB2(fileUrl) {
+  const keys = extractB2Keys(fileUrl);
+  if (!keys.length) return;
+  await fetch('/api/delete-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keys }),
+  });
+}
+
 async function uploadToB2(file) {
   const ext = file.name.split('.').pop();
   const fileName = `${currentTeam.id}/${currentTaskId}_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
@@ -971,6 +990,7 @@ async function deleteTeamSubmission(taskId) {
   if (!confirm('Slett innlevering? Poengene dine fjernes.')) return;
   const sub = currentSubMap[taskId];
   if (!sub) return;
+  await deleteFromB2(sub.file_url);
   await db.from('submissions').delete().eq('id', sub.id);
   const {data: remaining} = await db.from('submissions').select('points_awarded').eq('team_id', currentTeam.id).eq('status','approved');
   const total = (remaining||[]).reduce((a,s)=>a+(s.points_awarded||0),0);
@@ -1326,7 +1346,8 @@ async function setTimedResult(subId, taskId, teamName) {
 
 async function adminDeleteSubmission(subId) {
   if (!confirm('Slett innlevering og fjern poeng?')) return;
-  const {data: sub} = await db.from('submissions').select('team_id,task_id,points_awarded').eq('id',subId).single();
+  const {data: sub} = await db.from('submissions').select('team_id,task_id,points_awarded,file_url').eq('id',subId).single();
+  await deleteFromB2(sub?.file_url);
   await db.from('submissions').delete().eq('id',subId);
   if (sub?.team_id) {
     const {data: remaining} = await db.from('submissions').select('points_awarded').eq('team_id',sub.team_id).eq('status','approved');
@@ -1410,6 +1431,8 @@ async function addTask() {
 
 async function deleteTeam(id) {
   if(!confirm('Slett lag og alle innleveringer?'))return;
+  const {data: subs} = await db.from('submissions').select('file_url').eq('team_id',id);
+  await Promise.all((subs||[]).map(s => deleteFromB2(s.file_url)));
   await db.from('submissions').delete().eq('team_id',id);
   await db.from('teams').delete().eq('id',id);
   showToast('Lag slettet.'); loadManageData();
@@ -1417,6 +1440,8 @@ async function deleteTeam(id) {
 
 async function deleteTask(id) {
   if(!confirm('Slett oppgaven og alle innleveringer?'))return;
+  const {data: subs} = await db.from('submissions').select('file_url').eq('task_id',id);
+  await Promise.all((subs||[]).map(s => deleteFromB2(s.file_url)));
   await db.from('submissions').delete().eq('task_id',id);
   await db.from('tasks').delete().eq('id',id);
   showToast('Oppgave slettet.'); loadManageData();
