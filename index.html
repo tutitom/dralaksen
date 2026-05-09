@@ -1060,74 +1060,6 @@ function removeSelectedFile(index) {
   renderUploadPreviews();
 }
 
-async function compressImage(file) {
-  return new Promise(resolve => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const MAX = 1920;
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width >= height) { height = Math.round(height * MAX / width); width = MAX; }
-        else { width = Math.round(width * MAX / height); height = MAX; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      canvas.toBlob(blob => {
-        if (!blob) { resolve(file); return; }
-        const out = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
-        resolve(out.size < file.size ? out : file);
-      }, 'image/jpeg', 0.82);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
-}
-
-let _ffmpegMod = null;
-async function getFFmpeg() {
-  if (_ffmpegMod) return _ffmpegMod;
-  const [{ FFmpeg }, { fetchFile, toBlobURL }] = await Promise.all([
-    import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js'),
-    import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js'),
-  ]);
-  const ffmpeg = new FFmpeg();
-  const base = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
-  });
-  _ffmpegMod = { ffmpeg, fetchFile };
-  return _ffmpegMod;
-}
-
-async function compressVideo(file) {
-  try {
-    const { ffmpeg, fetchFile } = await getFFmpeg();
-    const ext = file.name.split('.').pop();
-    const inName = `in.${ext}`, outName = 'out.mp4';
-    await ffmpeg.writeFile(inName, await fetchFile(file));
-    await ffmpeg.exec([
-      '-i', inName,
-      '-vf', "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
-      '-c:v', 'libx264', '-crf', '28', '-preset', 'fast',
-      '-c:a', 'aac', '-b:a', '96k',
-      '-movflags', '+faststart',
-      outName,
-    ]);
-    const data = await ffmpeg.readFile(outName);
-    await ffmpeg.deleteFile(inName);
-    await ffmpeg.deleteFile(outName);
-    const blob = new Blob([data.buffer], { type: 'video/mp4' });
-    const out = new File([blob], file.name.replace(/\.[^.]+$/, '.mp4'), { type: 'video/mp4' });
-    return out.size < file.size ? out : file;
-  } catch (e) {
-    console.warn('Video komprimering feilet, bruker original:', e);
-    return file;
-  }
-}
 
 async function submitProof() {
   if (!selectedFiles.length||!currentTaskId) return;
@@ -1138,13 +1070,6 @@ async function submitProof() {
     let file = selectedFiles[i];
     const idx = selectedFiles.length > 1 ? ` (${i+1}/${selectedFiles.length})` : '';
     try {
-      if (file.type.startsWith('image/')) {
-        btn.textContent = `Komprimerer bilde${idx}...`;
-        file = await compressImage(file);
-      } else if (file.type.startsWith('video/')) {
-        btn.textContent = `Komprimerer video${idx}... (kan ta litt tid)`;
-        file = await compressVideo(file);
-      }
       btn.textContent = `Laster opp${idx}...`;
       const url = await uploadToB2(file);
       urls.push(url);
